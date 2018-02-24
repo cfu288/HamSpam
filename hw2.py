@@ -1,15 +1,15 @@
 import numpy as np
 import argparse, os, re, functools
-from stemmer import stemDir
 from stemmer import stemDoc
 
 #Naive Bayes Classifier
 def getArgs():
     p = argparse.ArgumentParser(description='Read and proceess a series of txt files in a directory to one clean stemmed text file.')
-    p.add_argument('ham', help='spam txt file')
-    p.add_argument('spam', help='ham txt file')
-    p.add_argument('hamDir', help='needed to count number of ham files')
-    p.add_argument('spamDir', help='needed to count number of spam files')
+    p.add_argument('ham', help='An already stemmed text file containing all of the words in all the HAM emails in the TRAINING set')
+    p.add_argument('spam', help='An already stemmed text file containing all of the words in all the SPAM emails in the TRAINING set')
+    p.add_argument('hamDir', help='The directory where all the HAM emails in the TEST set are located')
+    p.add_argument('spamDir', help='The directory where all the SPAM emails in the TEST set are located')
+    p.add_argument('stopWords',nargs='?',default ='', help='file of stopwords to ignore when stemming')
     return p.parse_args()
 
 def initBag(ham):
@@ -57,14 +57,14 @@ def genProbFromList(list, hamBag, spamBag, HorS):
             #pr = "   FOUND {}/{}, {}".format(hInst, totNumWordsInHam + totUniqueWordsInHam, frac) if HorS == "HAM" else "   FOUND {}/{}, {}".format(sInst, totNumWordsInSpam + totUniqueWordsInSpam, frac)
     return percList
 
-def test(dir,hamBag, spamBag, HorS, hprior, sprior):
+def test(dir,hamBag, spamBag, HorS, hprior, sprior,stopwords=""):
     correct = 0
     total = 0
     #for each email in dir
     for doc in os.listdir(dir):
         total += 1
         #print("stemming {}\{}".format(dir,doc))
-        l = stemDoc(dir+doc)
+        l = stemDoc(dir+doc) if stopwords=="" else stemDoc(dir+doc,stopwords)
         #print("CALC HAM PROB ON TEST EMAIL")
         l2 = genProbFromList(l, hamBag, spamBag, "HAM")
         #print("CALC SPAM PROB ON TEST EMAIL")
@@ -91,6 +91,7 @@ if __name__ == "__main__":
     spam = args.spam
     hamDir = args.hamDir
     spamDir = args.spamDir
+    stopWords = args.stopWords
 
     hamBag = initBag(ham)
     spamBag = initBag(spam)
@@ -101,7 +102,7 @@ if __name__ == "__main__":
     
     #Naive Bayes
     print("Running Naive Bayes with Laplace Smoothing of 1")
-    ham_res = test("test/ham/",hamBag,spamBag,"HAM",prior_ham,prior_spam)
-    spam_res = test("test/spam/",hamBag,spamBag,"SPAM",prior_ham,prior_spam)
+    ham_res = test(hamDir,hamBag,spamBag,"HAM",prior_ham,prior_spam,stopWords)
+    spam_res = test(spamDir,hamBag,spamBag,"SPAM",prior_ham,prior_spam,stopWords)
     print("\tDetected {:.2f}% ham correctly".format(ham_res))
     print("\tDetected {:.2f}% spam correctly".format(spam_res))
