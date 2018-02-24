@@ -12,9 +12,12 @@ def getArgs():
     p.add_argument('stopWords',nargs='?',default ='', help=' (optional) file of stopwords to ignore when stemming')
     return p.parse_args()
 
-# Given a stemmed text file generated from all of the ham files, 
-# convert the document into a bag of words (stored as a dictionary) 
-# and return the bag
+''' (string) -> dict
+
+    Given the name of a stemmed text file (ham) generated from all 
+    of the ham files, convert the document into a bag of words 
+    stored as a dictionary and return the bag
+'''
 def initBag(ham):
     d = {}
     with open(ham,'r') as openFile:
@@ -25,28 +28,35 @@ def initBag(ham):
                 else:
                     d[word] += 1
     return d
+''' (float, list) -> float
 
-# Calculate the conditional probability of email being in a class
-# given the prior and a list of the probabilites for each word in 
-# the email. Returns the probability of email in class.
+    Calculate the conditional probability of email being in a class
+    given the prior (prior) and a list of the probabilites (probList) 
+    for each word in the email. Returns the log probability of that 
+    email being part of a class.
+'''
 def calcCondProb(prior, probList):
     probList.append(prior)
     logList = map((lambda x: np.log(x)), probList)
     prodRes = sum(logList)
     return prodRes
 
-# Given a list of all the words in one TEST email file,
-# return a list of the probabilities of each word appearing
-# in either a HAM or SPAM email. Laplace smoothing of 1 applied
-# to all probabilities to avoid a zero probability for new words.
-def genProbFromList(list, hamBag, spamBag, HorS):
+''' (list , dict, dict, string) -> list
+
+    Given a list of all the words in one TEST email file (listIn),
+    return a new list of the probabilities of each word appearing
+    in either a HAM or SPAM email, depending on the paramater (HorS). 
+    Laplace smoothing of 1 is applied to all probabilities to avoid 
+    a zero probability for new words.
+'''
+def genProbFromList(listIn, hamBag, spamBag, HorS):
     #from email, take each word, calculate prob, add to list
     percList = []
     totNumWordsInHam = sum(hamBag.values())
     totUniqueWordsInHam = len(hamBag)
     totNumWordsInSpam = sum(spamBag.values())
     totUniqueWordsInSpam = len(spamBag)
-    for word in list:
+    for word in listIn:
         #calc probability from word
         hInst=hamBag.get(word, 0)
         sInst=spamBag.get(word, 0)
@@ -61,8 +71,15 @@ def genProbFromList(list, hamBag, spamBag, HorS):
             percList.append(frac)
     return percList
 
-# Run a test on all of the emails in a given directory,
-# return a percent of correctly classified emails.
+''' (string, dict, dict, string, float, float, string) -> float
+
+    Run a test on all of the emails in a given directory (dir),
+    using bag of words for both ham (hamBag) and spam (spamBag).
+    Return a percent of correctly classified emails given what 
+    class they should be (HorS) and the ham prior (hprior) and
+    spam prior (sprior).
+
+'''
 def test(dir,hamBag, spamBag, HorS, hprior, sprior,stopwords=""):
     correct = 0
     total = 0
@@ -82,7 +99,7 @@ def test(dir,hamBag, spamBag, HorS, hprior, sprior,stopwords=""):
     return correct/total
     #print("{}/{} correct, {:.2f}%".format(correct, total, (correct/total*100)))
 
-#main function
+# Main function
 if __name__ == "__main__":
     # Get arguments
     args = getArgs()
@@ -99,7 +116,7 @@ if __name__ == "__main__":
     # Calculate priors for NB
     hamCount = len(os.listdir(hamDir))    
     spamCount = len(os.listdir(spamDir))    
-    prior_ham = hamCount / (hamCount+spamCount)
+    prior_ham = hamCount / (hamCount+spamCount) # number of hamDocs/totalDocs
     prior_spam = spamCount / (hamCount+spamCount)
     
     # Run Naive Bayes
