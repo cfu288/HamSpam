@@ -9,8 +9,8 @@
 ## Example:
     ➜ python3 hw2.py stemmedFiles/train-ham-stemmed.txt stemmedFiles/train-spam-stemmed.txt  test/ham/ test/spam/
     Running Naive Bayes with Laplace Smoothing of 1
-            Detected 0.95% ham correctly
-            Detected 0.97% spam correctly
+        Detected 0.95% ham correctly
+        Detected 0.97% spam correctly
 
     ➜ python3 hw2.py stemmedFiles/train-ham-stemmed-no-stopwords.txt stemmedFiles/train-spam-stemmed-no-stopwords.txt test/ham/ test/spam/ stopwords.txt 
     Running Naive Bayes with Laplace Smoothing of 1
