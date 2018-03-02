@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import argparse, os, re, functools
 from stemmer import stemDoc
+import random
 
 #Naive Bayes Classifier
 def getArgs():
@@ -14,10 +15,16 @@ def getArgs():
     p.add_argument('spam', 
             help='An already stemmed text file containing all of the words \
             in all the SPAM emails in the TRAINING set')
-    p.add_argument('hamDir', 
+    p.add_argument('testHamDir', 
             help='The directory where all the HAM emails in the TEST set \
                     are located')
-    p.add_argument('spamDir', 
+    p.add_argument('testSpamDir', 
+            help='The directory where all the SPAM emails in the TEST set \
+            are located')
+    p.add_argument('trainHamDir', 
+            help='The directory where all the HAM emails in the TEST set \
+                    are located')
+    p.add_argument('trainSpamDir', 
             help='The directory where all the SPAM emails in the TEST set \
             are located')
     p.add_argument('stopWords',nargs='?',default ='', 
@@ -90,10 +97,10 @@ def genProbFromList(listIn, hamBag, spamBag, HorS):
             percList.append(frac)
     return percList
 
-def testNB(dir,hamBag, spamBag, HorS, hprior, sprior,stopwords=""):
+def testNB(testdir,hamBag, spamBag, HorS, hprior, sprior,stopwords=""):
     ''' (string, dict, dict, string, float, float, string) -> float
 
-        Run a test on all of the emails in a given directory (dir),
+        Run a test on all of the emails in a given directory (testdir),
         using bag of words for both ham (hamBag) and spam (spamBag).
         Return a percent of correctly classified emails given what 
         class they should be (HorS) and the ham prior (hprior) and
@@ -103,9 +110,9 @@ def testNB(dir,hamBag, spamBag, HorS, hprior, sprior,stopwords=""):
     correct = 0
     total = 0
     #for each email in dir
-    for doc in os.listdir(dir):
+    for doc in os.listdir(testdir):
         total += 1
-        l = stemDoc(dir+doc) if stopwords=="" else stemDoc(dir+doc,stopwords)
+        l = stemDoc(testdir+doc) if stopwords=="" else stemDoc(testdir+doc,stopwords)
         l2 = genProbFromList(l, hamBag, spamBag, "HAM")
         l3 = genProbFromList(l, hamBag, spamBag, "SPAM")
         hres = calcCondProb(hprior, l2)
@@ -123,12 +130,11 @@ def testNB(dir,hamBag, spamBag, HorS, hprior, sprior,stopwords=""):
 def initBag1(doclist):
     ''' (list) -> dict
 
-        Given the name of a stemmed text file (ham) generated from 
-        all of the ham files, convert the document into a bag of 
-        words stored as a dictionary and return the bag
+        Given the name of a stemmed list (doclist) generated from 
+        a single email, convert the document into a bag of 
+        words stored as a dictionary and return the bag.
         Bag of words here is slightly different than the one above
-        as probability of word is stored instead of freq. Don't need 
-        to do this, but saves time on calculations later
+        as probability of word is stored instead of freq.
     '''
     d = {}
     for word in doclist:
@@ -142,13 +148,13 @@ def initBag1(doclist):
     return d
 
 def sigmoid(z):
-    return 1/(1+np.exp(-x))
+    return 1/(1+np.exp(-z))
 
 def genDataArr(testHamDir, testSpamDir, uniqueWords, stopwords=""):
-    numOfDocs = len(os.listdir(testHamDir)+os.listdir(testSpamDir)) #indexed rows
-    numOfAttr = len(uniqueWords)+2 #column names
     uniqueWords.append("THRESHOLD")
     uniqueWords.append("CLASS")
+    numOfDocs = len(os.listdir(testHamDir)+os.listdir(testSpamDir)) #indexed rows
+    numOfAttr = len(uniqueWords) #column names
     #print(uniqueWords)
 
     zero_data = np.zeros(shape=(numOfDocs,numOfAttr))
@@ -160,7 +166,7 @@ def genDataArr(testHamDir, testSpamDir, uniqueWords, stopwords=""):
     # For document in Ham dir
     for doc in os.listdir(testHamDir):
         if ind%10 == 0:
-            print("processing doc {} of {}".format(ind,numOfDocs))
+            print("processing doc {} of {}".format(ind,numOfDocs), end="\r")
         # Stem the document
         listFromDoc = stemDoc(testHamDir+doc) if stopwords=="\
                 " else stemDoc(testHamDir+doc,stopwords)
@@ -179,32 +185,97 @@ def genDataArr(testHamDir, testSpamDir, uniqueWords, stopwords=""):
                 #print("could not insert " + str(key))
                 pass
         # Set class to HAM and threshold to 1
-        df.loc[ind, "CLASS"] = 1
         df.loc[ind, "THRESHOLD"] = 1
+        df.loc[ind, "CLASS"] = 1
         # Start at next document
         ind+=1
 
-    #for doc in os.listdir(testSpamDir):
-    #    print(doc)
+    for doc in os.listdir(testSpamDir):
+        if ind%10 == 0:
+            print("processing doc {} of {}".format(ind,numOfDocs),end="\r")
         # Stem the document
-    #    l = stemDoc(testSpamDir+doc) if stopwords==" \
-    #            " else stemDoc(testSpamDir+doc,stopwords)
-    #    bag = initBag1(l)
+        listFromDoc = stemDoc(testSpamDir+doc) if stopwords=="\
+                " else stemDoc(testSpamDir+doc,stopwords)
+        bag = initBag1(listFromDoc)
         # Move probablilites into df from bag
-    #    for key in bag:
-    #        try:
-    #            df[ind, key] = bag[key]
-    #        except:
-    #            print("{} not found".format(key))
-        # Set class to HAM and threshold to 1
-    #    df[ind, "CLASS"] = 1
-    #    df[ind, "THRESHOLD"] = 1
+        for key in bag:
+            try:
+                currentInd = df.loc[ind,key]
+                df.loc[ind, key] = bag[key]
+            except KeyError:
+                pass
+        # Set class to SPAM and threshold to 1
+        df.loc[ind, "THRESHOLD"] = 1
+        df.loc[ind, "CLASS"] = 0
         # Start at next document
-    #    ind+=1
+        ind+=1
 
     return df
 
+def mcap(df, itr, n, lamb):
+    # Set size of pr to len of row count - num of docs
+    Pr = np.random.rand(df.shape[0])
+    # Set size of w to num of attr, - 2 for class and threshold
+    w = np.random.rand(df.shape[1]-1)
+    df2 = df[df.columns.difference(["CLASS"])]
+    #print("pr(docs):{}, w(attr):{}".format(len(Pr), len(w)))
+    for iteration in range(0,itr):
+        for x in range(0,df.shape[0]-1): # include all docs 
+            #print(df2)
+            WxAttr = df2.loc[x,:].dot(w)
+            Pr[x] = sigmoid(WxAttr)
+            #break
+            dw = np.zeros(df.shape[1]-1) # set size q to num of attr -1 for class
+        i = 0
+        for attr in list(df.columns.values):
+            if attr != "CLASS":
+                for j in range(0, df.shape[0]-1):
+                    classVal = df.loc[j,"CLASS"]
+                    dw[i]=dw[i]+df.loc[j,attr]*(classVal- Pr[j])
+            i+=1
+        for i in range(0,df.shape[1]-2):
+            w[i] = w[i]+n*(dw[i]-(lamb*w[i])) # Shift weights with regularization
+    #print(list(df.columns.values))
+    #print("w:{}".format(w))
+    return w     
 
+def testLR(testHamDir,testSpamDir,w, stopwords=""):
+    total = 0
+    totalCorrect = 0
+    for doc in os.listdir(testHamDir):
+        #print("TESTING " + doc)
+        total += 1
+        # Stem the document
+        listFromDoc = stemDoc(testHamDir+doc) if stopwords=="\
+                " else stemDoc(testHamDir+doc,stopwords)
+        bag = initBag1(listFromDoc)
+        resList = []
+        # for word in bag, find resulting weight in dict, multiply the two, store in list
+        resList.append(w["THRESHOLD"]) #append w0
+        for key in bag.keys():
+            print("{}:w{}, b:{}".format(key,w[key],bag[key]))
+            if key in w:
+                resList.append(w[key]*bag[key])
+        #print(sum(resList))
+        if sum(resList) > 1:
+            totalCorrect += 1
+    
+    for doc in os.listdir(testSpamDir):
+        total += 1
+        # Stem the document
+        listFromDoc = stemDoc(testSpamDir+doc) if stopwords=="\
+               " else stemDoc(testSpamDir+doc,stopwords)
+        bag = initBag1(listFromDoc)
+        resList = []
+       # for word in bag, find resulting weight in dict, multiply the two, store in list
+        resList.append(w["THRESHOLD"]) #append w0
+        for key in bag.keys():
+            if key in w:
+                resList.append(w[key]*bag[key])
+        if sum(resList) < 1:
+            totalCorrect += 1
+    print("result is {}%".format(totalCorrect/total*100))
+    return totalCorrect/total
 
 #--------------MAIN--------------------
 
@@ -213,8 +284,10 @@ if __name__ == "__main__":
     args = getArgs()
     ham = args.ham
     spam = args.spam
-    hamDir = args.hamDir
-    spamDir = args.spamDir
+    testHamDir = args.testHamDir
+    testSpamDir = args.testSpamDir
+    trainHamDir = args.trainHamDir
+    trainSpamDir = args.trainSpamDir
     stopWords = args.stopWords
 
     # Initialize bags from stemmed test email files
@@ -229,19 +302,31 @@ if __name__ == "__main__":
     attrlst = list(tot)
     #print(total)
     # Calculate priors for NB
-    hamCount = len(os.listdir(hamDir))    
-    spamCount = len(os.listdir(spamDir))    
+    hamCount = len(os.listdir(trainHamDir))    
+    spamCount = len(os.listdir(trainSpamDir))    
     prior_ham = hamCount / (hamCount+spamCount) # number of hamDocs/totalDocs
     prior_spam = spamCount / (hamCount+spamCount)
     
     # Run Naive Bayes
     print("Running Naive Bayes with Laplace Smoothing of 1")
-    #ham_res = testNB(hamDir,hamBag,spamBag,"HAM",prior_ham,prior_spam,stopWords)
-    #spam_res = testNB(spamDir,hamBag,spamBag,"SPAM",prior_ham,prior_spam,stopWords)
+    #ham_res = testNB(testHamDir,hamBag,spamBag,"HAM",prior_ham,prior_spam,stopWords)
+    #spam_res = testNB(testSpamDir,hamBag,spamBag,"SPAM",prior_ham,prior_spam,stopWords)
     #print("\tDetected {:.2f}% ham correctly".format(ham_res))
     #print("\tDetected {:.2f}% spam correctly".format(spam_res))
     
     print("Running MCAP with L2")
-    #l = stemDoc("minitest/ham/t1.txt")
-    data_df = genDataArr('test/ham/','test/spam/',attrlst)
-    print(data_df)
+    # Get df, columns are attr, rows are docs
+    data_df = None
+    try:
+        data_df = pd.read_csv("df.csv",index_col=0)
+    except:
+        data_df = genDataArr(trainHamDir,trainSpamDir,attrlst)
+        print("saving data_df to csv df.csv to save time on future runs")
+        data_df.to_csv("df.csv")
+    #print(data_df)
+    w = mcap(data_df, 10, .02, 1)
+    mapW = dict(zip(data_df.columns.values,w))
+    #sorted(mapW.keys())
+    #print("MAPPING: {}".format(mapW))
+    testLR(testHamDir,testSpamDir,mapW)
+    #testLR("minitest/tmph/","minitest/tmps/",mapW)

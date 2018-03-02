@@ -1,5 +1,0 @@
-4881
-5561
-Running Naive Bayes with Laplace Smoothing of 1
-Running MCAP with L2
-1174.2000-05-31.farmer.ham.txt
