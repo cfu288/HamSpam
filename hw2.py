@@ -217,12 +217,14 @@ def mcap(df, itr, n, lamb):
     Pr = np.random.rand(df.shape[0])
     # Set size of w to num of attr, - 2 for class and threshold
     w = np.random.rand(df.shape[1]-1)
+    print("numofrow(col):{}".format(df.shape[0]))
+    print("numofattr(col):{}".format(df.shape[1]))
     df2 = df[df.columns.difference(["CLASS"])]
     #print("pr(docs):{}, w(attr):{}".format(len(Pr), len(w)))
     for iteration in range(0,itr):
-        print("iteration {} : 0".format(iteration),end="\r")
+        print("\titeration {} : 0".format(iteration),end="\r")
         for x in range(0,df.shape[0]-1): # include all docs 
-            print("iteration {} : {}".format(iteration,x),end="\r")
+            print("\titeration {} : {}".format(iteration,x),end="\r")
             #print(df2)
             WxAttr = df2.loc[x,:].dot(w)
             Pr[x] = sigmoid(WxAttr)
@@ -230,8 +232,10 @@ def mcap(df, itr, n, lamb):
             dw = np.zeros(df.shape[1]-1) # set size q to num of attr -1 for class
         i = 0
         for attr in list(df.columns.values):
+            print("\titeration {} : {}".format(iteration,i),end="\r")
             if attr != "CLASS":
                 for j in range(0, df.shape[0]-1):
+                    #print("i:{}, j:{}".format(i,j))
                     classVal = df.loc[j,"CLASS"]
                     dw[i]=dw[i]+df.loc[j,attr]*(classVal- Pr[j])
             i+=1
@@ -255,10 +259,9 @@ def testLR(testHamDir,testSpamDir,w, stopwords=""):
         # for word in bag, find resulting weight in dict, multiply the two, store in list
         resList.append(w["THRESHOLD"]) #append w0
         for key in bag.keys():
-            print("{}:w{}, b:{}".format(key,w[key],bag[key]))
+            #print("{}:w{}, b:{}".format(key,w[key],bag[key]))
             if key in w:
                 resList.append(w[key]*bag[key])
-        #print(sum(resList))
         if sum(resList) > 1:
             totalCorrect += 1
     
@@ -328,11 +331,8 @@ if __name__ == "__main__":
     
     runForItr = 1 
     print("\tRunning MCAP with {} iterations".format(runForItr))
-    #print(data_df)
     w = mcap(data_df, runForItr, .02, 1)
     mapW = dict(zip(data_df.columns.values,w))
-    #sorted(mapW.keys())
-    #print("MAPPING: {}".format(mapW))
     print("\tTesting MCAP")
     testLR(testHamDir,testSpamDir,mapW)
     #testLR("minitest/tmph/","minitest/tmps/",mapW)
