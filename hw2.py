@@ -220,7 +220,9 @@ def mcap(df, itr, n, lamb):
     df2 = df[df.columns.difference(["CLASS"])]
     #print("pr(docs):{}, w(attr):{}".format(len(Pr), len(w)))
     for iteration in range(0,itr):
+        print("iteration {} : 0".format(iteration),end="\r")
         for x in range(0,df.shape[0]-1): # include all docs 
+            print("iteration {} : {}".format(iteration,x),end="\r")
             #print(df2)
             WxAttr = df2.loc[x,:].dot(w)
             Pr[x] = sigmoid(WxAttr)
@@ -321,12 +323,16 @@ if __name__ == "__main__":
         data_df = pd.read_csv("df.csv",index_col=0)
     except:
         data_df = genDataArr(trainHamDir,trainSpamDir,attrlst)
-        print("saving data_df to csv df.csv to save time on future runs")
+        print("\tsaving data_df to csv df.csv to save time on future runs")
         data_df.to_csv("df.csv")
+    
+    runForItr = 1 
+    print("\tRunning MCAP with {} iterations".format(runForItr))
     #print(data_df)
-    w = mcap(data_df, 10, .02, 1)
+    w = mcap(data_df, runForItr, .02, 1)
     mapW = dict(zip(data_df.columns.values,w))
     #sorted(mapW.keys())
     #print("MAPPING: {}".format(mapW))
+    print("\tTesting MCAP")
     testLR(testHamDir,testSpamDir,mapW)
     #testLR("minitest/tmph/","minitest/tmps/",mapW)
