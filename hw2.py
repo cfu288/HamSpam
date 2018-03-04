@@ -151,6 +151,13 @@ def sigmoid(z):
     return 1/(1+np.exp(-z))
 
 def genDataArr(testHamDir, testSpamDir, uniqueWords, stopwords=""):
+    '''
+    (string,string,list,string)-> pandas dataframe
+    Generate a dataframe storing the probabilities of each word in each document.
+    This DF is later used in the MCAP algorithm. Takes the directory of training dir
+    for ham and spam (inaccuratly labeled testHamDir and testSpamDir here) as well as
+    a list of unique attributes to build the df. Stopwords are optional
+    '''
     uniqueWords.append("THRESHOLD")
     uniqueWords.append("CLASS")
     numOfDocs = len(os.listdir(testHamDir)+os.listdir(testSpamDir)) #indexed rows
@@ -212,44 +219,53 @@ def genDataArr(testHamDir, testSpamDir, uniqueWords, stopwords=""):
 
     return df
 
+
 def mcap(df, itr, n, lamb):
+    '''(df, int, int, int) -> arr
+    Takes in dataframe and 3 ints for the weight function, returns
+    an array of weights to be used.
+    '''
     # Set size of pr to len of row count - num of docs
-    Pr = np.random.rand(df.shape[0])
+    #Pr = np.random.rand(df.shape[0])
+    Pr = np.full(df.shape[0],.5)
     # Set size of w to num of attr, - 2 for class and threshold
-    w = np.random.rand(df.shape[1]-1)
-    print("numofrow(col):{}".format(df.shape[0]))
-    print("numofattr(col):{}".format(df.shape[1]))
+    #w = np.random.rand(df.shape[1]-1)
+    w = np.full(df.shape[1]-1, .5)
     df2 = df[df.columns.difference(["CLASS"])]
-    #print("pr(docs):{}, w(attr):{}".format(len(Pr), len(w)))
     for iteration in range(0,itr):
-        print("\titeration {} : 0".format(iteration),end="\r")
-        for x in range(0,df.shape[0]-1): # include all docs 
-            print("\titeration {} : {}".format(iteration,x),end="\r")
-            #print(df2)
+        # Calculate Pr[i] = Pr(class=1|Data[i],w)
+        for x in range(0,df.shape[0]): # include all docs 
             WxAttr = df2.loc[x,:].dot(w)
+            #print("DOC {} DP: {}".format(x, WxAttr))
             Pr[x] = sigmoid(WxAttr)
-            #break
-            dw = np.zeros(df.shape[1]-1) # set size q to num of attr -1 for class
-        i = 0
+            #print("DOC {} Sig: {}".format(x, Pr[x]))
+        # Array dw[0..n] init to 0
+        dw = np.zeros(df.shape[1]-1) # set size q to num of attr -1 for class
+        
+        i = 0 #col/attr selector
         for attr in list(df.columns.values):
-            print("\titeration {} : {}".format(iteration,i),end="\r")
             if attr != "CLASS":
-                for j in range(0, df.shape[0]-1):
-                    #print("i:{}, j:{}".format(i,j))
+                for j in range(0, df.shape[0]): # for each example doc of attr
                     classVal = df.loc[j,"CLASS"]
                     dw[i]=dw[i]+df.loc[j,attr]*(classVal- Pr[j])
+                #print("attr {} has dw[{}] : {}".format(attr,i,dw[i]))
             i+=1
-        for i in range(0,df.shape[1]-2):
-            w[i] = w[i]+n*(dw[i]-(lamb*w[i])) # Shift weights with regularization
-    #print(list(df.columns.values))
-    #print("w:{}".format(w))
+        for i in range(0,df.shape[1]-1):
+            w[i] = w[i] + n*(dw[i]-(lamb*w[i])) # Shift weights with regularization
+        #print("W on {} iteration : {}".format(iteration,w))
+        #print("Pr on {} iteration : {}".format(iteration, Pr))
+        #print("dw on {} iteration : {}".format(iteration, dw))
     return w     
 
 def testLR(testHamDir,testSpamDir,w, stopwords=""):
+    '''(string,string,dict,string) -> float
+    takes two dir names in string form that hold the test emails, a dict with the 
+    trained weights from MCAP, and an optional txt file with stop words. It returns
+    the percent of test emails it correctly predicts.
+    '''
     total = 0
     totalCorrect = 0
     for doc in os.listdir(testHamDir):
-        #print("TESTING " + doc)
         total += 1
         # Stem the document
         listFromDoc = stemDoc(testHamDir+doc) if stopwords=="\
@@ -257,12 +273,12 @@ def testLR(testHamDir,testSpamDir,w, stopwords=""):
         bag = initBag1(listFromDoc)
         resList = []
         # for word in bag, find resulting weight in dict, multiply the two, store in list
-        resList.append(w["THRESHOLD"]) #append w0
+        #resList.append(w["THRESHOLD"]) #append w0
         for key in bag.keys():
-            #print("{}:w{}, b:{}".format(key,w[key],bag[key]))
             if key in w:
                 resList.append(w[key]*bag[key])
-        if sum(resList) > 1:
+        #print("HAM {} has sig {}".format(doc,sigmoid(sum(resList))))
+        if sigmoid(sum(resList)) > .5:
             totalCorrect += 1
     
     for doc in os.listdir(testSpamDir):
@@ -272,14 +288,15 @@ def testLR(testHamDir,testSpamDir,w, stopwords=""):
                " else stemDoc(testSpamDir+doc,stopwords)
         bag = initBag1(listFromDoc)
         resList = []
-       # for word in bag, find resulting weight in dict, multiply the two, store in list
-        resList.append(w["THRESHOLD"]) #append w0
+        # for word in bag, find resulting weight in dict, multiply the two, store in list
+        #resList.append(w["THRESHOLD"]) #append w0
         for key in bag.keys():
             if key in w:
                 resList.append(w[key]*bag[key])
-        if sum(resList) < 1:
+        #print("SPAM {} has sig {}".format(doc,sigmoid(sum(resList))))
+        if sigmoid(sum(resList)) < .5:
             totalCorrect += 1
-    print("result is {}%".format(totalCorrect/total*100))
+    #print("{}/{}".format(totalCorrect,total))
     return totalCorrect/total
 
 #--------------MAIN--------------------
@@ -305,7 +322,7 @@ if __name__ == "__main__":
     #total = len(hamBag) + len(spamBag) - len(l.intersection(l2))
     tot = l.union(l2)
     attrlst = list(tot)
-    #print(total)
+    
     # Calculate priors for NB
     hamCount = len(os.listdir(trainHamDir))    
     spamCount = len(os.listdir(trainSpamDir))    
@@ -314,25 +331,29 @@ if __name__ == "__main__":
     
     # Run Naive Bayes
     print("Running Naive Bayes with Laplace Smoothing of 1")
-    #ham_res = testNB(testHamDir,hamBag,spamBag,"HAM",prior_ham,prior_spam,stopWords)
-    #spam_res = testNB(testSpamDir,hamBag,spamBag,"SPAM",prior_ham,prior_spam,stopWords)
-    #print("\tDetected {:.2f}% ham correctly".format(ham_res))
-    #print("\tDetected {:.2f}% spam correctly".format(spam_res))
+    ham_res = testNB(testHamDir,hamBag,spamBag,"HAM",prior_ham,prior_spam,stopWords)
+    spam_res = testNB(testSpamDir,hamBag,spamBag,"SPAM",prior_ham,prior_spam,stopWords)
+    print("\tDetected {:.2f}% ham correctly".format(ham_res*100))
+    print("\tDetected {:.2f}% spam correctly".format(spam_res*100))
     
+    # Run Logistic Regression
     print("Running MCAP with L2")
     # Get df, columns are attr, rows are docs
     data_df = None
     try:
         data_df = pd.read_csv("df.csv",index_col=0)
     except:
-        data_df = genDataArr(trainHamDir,trainSpamDir,attrlst)
-        print("\tsaving data_df to csv df.csv to save time on future runs")
+        data_df = genDataArr(trainHamDir,trainSpamDir,attrlst,stopWords)
+        print("\tSaving data_df to csv df.csv to save time on future runs")
         data_df.to_csv("df.csv")
     
-    runForItr = 1 
+    print(data_df)
+    runForItr = 1
     print("\tRunning MCAP with {} iterations".format(runForItr))
     w = mcap(data_df, runForItr, .02, 1)
     mapW = dict(zip(data_df.columns.values,w))
+    print(mapW)
     print("\tTesting MCAP")
-    testLR(testHamDir,testSpamDir,mapW)
+    res = testLR(testHamDir,testSpamDir,mapW,stopWords)
+    print("Detected {:.2f}% correctly".format(res*100))
     #testLR("minitest/tmph/","minitest/tmps/",mapW)
