@@ -226,24 +226,35 @@ def mcap(df, itr, n, lamb):
     an array of weights to be used.
     '''
     # Set size of pr to len of row count - num of docs
-    Pr = np.random.rand(df.shape[0])
+    #Pr = np.random.rand(df.shape[0])
+    Pr = np.full(df.shape[0],.5)
     # Set size of w to num of attr, - 2 for class and threshold
-    w = np.random.rand(df.shape[1]-1)
+    #w = np.random.rand(df.shape[1]-1)
+    w = np.full(df.shape[1]-1, .5)
     df2 = df[df.columns.difference(["CLASS"])]
     for iteration in range(0,itr):
-        for x in range(0,df.shape[0]-1): # include all docs 
+        # Calculate Pr[i] = Pr(class=1|Data[i],w)
+        for x in range(0,df.shape[0]): # include all docs 
             WxAttr = df2.loc[x,:].dot(w)
+            #print("DOC {} DP: {}".format(x, WxAttr))
             Pr[x] = sigmoid(WxAttr)
-            dw = np.zeros(df.shape[1]-1) # set size q to num of attr -1 for class
-        i = 0
+            #print("DOC {} Sig: {}".format(x, Pr[x]))
+        # Array dw[0..n] init to 0
+        dw = np.zeros(df.shape[1]-1) # set size q to num of attr -1 for class
+        
+        i = 0 #col/attr selector
         for attr in list(df.columns.values):
             if attr != "CLASS":
-                for j in range(0, df.shape[0]-1):
+                for j in range(0, df.shape[0]): # for each example doc of attr
                     classVal = df.loc[j,"CLASS"]
-                    dw[i]=dw[i]+df.loc[j,attr]*(classVal- Pr[j])
+                    dw[i] = dw[i] + df.loc[j,attr] * (classVal - Pr[j])
+                #print("attr {} has dw[{}] : {}".format(attr,i,dw[i]))
             i+=1
-        for i in range(0,df.shape[1]-2):
-            w[i] = w[i]+n*(dw[i]-(lamb*w[i])) # Shift weights with regularization
+        for i in range(0,df.shape[1]-1):
+            w[i] = w[i] + n*(dw[i]-(lamb*w[i])) # Shift weights with regularization
+        #print("W on {} iteration : {}".format(iteration,w))
+        #print("Pr on {} iteration : {}".format(iteration, Pr))
+        #print("dw on {} iteration : {}".format(iteration, dw))
     return w     
 
 def testLR(testHamDir,testSpamDir,w, stopwords=""):
@@ -263,9 +274,13 @@ def testLR(testHamDir,testSpamDir,w, stopwords=""):
         resList = []
         # for word in bag, find resulting weight in dict, multiply the two, store in list
         resList.append(w["THRESHOLD"]) #append w0
+        print("H DOC {}:".format(doc))
+        print("  word {}, val {} ".format("threshold",w["THRESHOLD"]))
         for key in bag.keys():
             if key in w:
+                print("  word {}, freq in doc {}, weight {} ".format(key,bag[key],w[key]))
                 resList.append(w[key]*bag[key])
+        print("  {} has sig {}".format(doc,sigmoid(sum(resList))))
         if sigmoid(sum(resList)) > .5:
             totalCorrect += 1
     
@@ -278,12 +293,17 @@ def testLR(testHamDir,testSpamDir,w, stopwords=""):
         resList = []
         # for word in bag, find resulting weight in dict, multiply the two, store in list
         resList.append(w["THRESHOLD"]) #append w0
+        print("S DOC {}:".format(doc))
+        print("  word {}, val {} ".format("threshold",w["THRESHOLD"]))
         for key in bag.keys():
             if key in w:
+                print("  word {}, freq in doc {}, weight {} ".format(key,bag[key],w[key]))
                 resList.append(w[key]*bag[key])
+        print("  {} has sig {}".format(doc,sigmoid(sum(resList))))
         if sigmoid(sum(resList)) < .5:
             totalCorrect += 1
     #print("{}/{}".format(totalCorrect,total))
+    print("  \n\n")
     return totalCorrect/total
 
 #--------------MAIN--------------------
@@ -334,9 +354,10 @@ if __name__ == "__main__":
         print("\tSaving data_df to csv df.csv to save time on future runs")
         data_df.to_csv("df.csv")
     
-    runForItr = 1 
+    print(data_df)
+    runForItr = 10
     print("\tRunning MCAP with {} iterations".format(runForItr))
-    w = mcap(data_df, runForItr, .02, 1)
+    w = mcap(data_df, runForItr, .1, 1)
     mapW = dict(zip(data_df.columns.values,w))
     #print(mapW)
     print("\tTesting MCAP")
