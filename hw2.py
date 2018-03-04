@@ -229,15 +229,23 @@ def mcap(df, itr, n, lamb):
     #Pr = np.random.rand(df.shape[0])
     Pr = np.full(df.shape[0],.5)
     # Set size of w to num of attr, - 2 for class and threshold
+<<<<<<< HEAD
     #w = np.random.rand(df.shape[1]-1)
     w = np.full(df.shape[1]-1, .5)
     df2 = df[df.columns.difference(["CLASS"])]
     for iteration in range(0,itr):
         # Calculate Pr[i] = Pr(class=1|Data[i],w)
         for x in range(0,df.shape[0]): # include all docs 
+=======
+    w = np.random.rand(df.shape[1]-1)
+    df2 = df[df.columns.difference(["CLASS"])]
+    for iteration in range(0,itr):
+        for x in range(0,df.shape[0]-1): # include all docs 
+>>>>>>> 9e3e733d5cee3dc8c929144888cffe0c4c8bb946
             WxAttr = df2.loc[x,:].dot(w)
             #print("DOC {} DP: {}".format(x, WxAttr))
             Pr[x] = sigmoid(WxAttr)
+<<<<<<< HEAD
             #print("DOC {} Sig: {}".format(x, Pr[x]))
         # Array dw[0..n] init to 0
         dw = np.zeros(df.shape[1]-1) # set size q to num of attr -1 for class
@@ -246,15 +254,27 @@ def mcap(df, itr, n, lamb):
         for attr in list(df.columns.values):
             if attr != "CLASS":
                 for j in range(0, df.shape[0]): # for each example doc of attr
+=======
+            dw = np.zeros(df.shape[1]-1) # set size q to num of attr -1 for class
+        i = 0
+        for attr in list(df.columns.values):
+            if attr != "CLASS":
+                for j in range(0, df.shape[0]-1):
+>>>>>>> 9e3e733d5cee3dc8c929144888cffe0c4c8bb946
                     classVal = df.loc[j,"CLASS"]
                     dw[i]=dw[i]+df.loc[j,attr]*(classVal- Pr[j])
                 #print("attr {} has dw[{}] : {}".format(attr,i,dw[i]))
             i+=1
+<<<<<<< HEAD
         for i in range(0,df.shape[1]-1):
             w[i] = w[i] + n*(dw[i]-(lamb*w[i])) # Shift weights with regularization
         #print("W on {} iteration : {}".format(iteration,w))
         #print("Pr on {} iteration : {}".format(iteration, Pr))
         #print("dw on {} iteration : {}".format(iteration, dw))
+=======
+        for i in range(0,df.shape[1]-2):
+            w[i] = w[i]+n*(dw[i]-(lamb*w[i])) # Shift weights with regularization
+>>>>>>> 9e3e733d5cee3dc8c929144888cffe0c4c8bb946
     return w     
 
 def testLR(testHamDir,testSpamDir,w, stopwords=""):
@@ -277,7 +297,10 @@ def testLR(testHamDir,testSpamDir,w, stopwords=""):
         for key in bag.keys():
             if key in w:
                 resList.append(w[key]*bag[key])
+<<<<<<< HEAD
         #print("HAM {} has sig {}".format(doc,sigmoid(sum(resList))))
+=======
+>>>>>>> 9e3e733d5cee3dc8c929144888cffe0c4c8bb946
         if sigmoid(sum(resList)) > .5:
             totalCorrect += 1
     
@@ -289,11 +312,18 @@ def testLR(testHamDir,testSpamDir,w, stopwords=""):
         bag = initBag1(listFromDoc)
         resList = []
         # for word in bag, find resulting weight in dict, multiply the two, store in list
+<<<<<<< HEAD
         #resList.append(w["THRESHOLD"]) #append w0
         for key in bag.keys():
             if key in w:
                 resList.append(w[key]*bag[key])
         #print("SPAM {} has sig {}".format(doc,sigmoid(sum(resList))))
+=======
+        resList.append(w["THRESHOLD"]) #append w0
+        for key in bag.keys():
+            if key in w:
+                resList.append(w[key]*bag[key])
+>>>>>>> 9e3e733d5cee3dc8c929144888cffe0c4c8bb946
         if sigmoid(sum(resList)) < .5:
             totalCorrect += 1
     #print("{}/{}".format(totalCorrect,total))
@@ -352,7 +382,11 @@ if __name__ == "__main__":
     print("\tRunning MCAP with {} iterations".format(runForItr))
     w = mcap(data_df, runForItr, .02, 1)
     mapW = dict(zip(data_df.columns.values,w))
+<<<<<<< HEAD
     print(mapW)
+=======
+    #print(mapW)
+>>>>>>> 9e3e733d5cee3dc8c929144888cffe0c4c8bb946
     print("\tTesting MCAP")
     res = testLR(testHamDir,testSpamDir,mapW,stopWords)
     print("Detected {:.2f}% correctly".format(res*100))
